@@ -1,0 +1,161 @@
+---
+title: 'Classification Tree: Carseats dataset'
+author: "Nathacia Nathacia"
+date: '2022-07-09'
+output: pdf_document
+---
+
+#### Load packages and dataset
+```{r, results='hide'}
+library(ISLR)
+library(tree)
+library(caret)
+
+data(package="ISLR")
+dtree <- Carseats
+class(dtree)
+dtree$Sales
+View(dtree)
+```
+
+
+### Investigate the data
+```{r}
+names(dtree)
+head(dtree)
+tail(dtree)
+summary(dtree)
+```
+
+
+### Preprocessing - discretization
+```{r}
+High <- ifelse(dtree$Sales<=8, "NO", "YES")
+class(High)
+High <- as.factor(High)
+class(High)
+dtree <- data.frame(dtree,High)
+dtree <- subset(dtree, select=-Sales)
+```
+
+
+### Training
+```{r}
+dtree.carseats <- tree(High~., dtree)
+summary(dtree.carseats)
+plot(dtree.carseats)
+text(dtree.carseats, pretty = 0)
+print(dtree.carseats)
+```
+
+
+### Splitting the data
+Splitting the original data set to create training and testing data sets
+```{r}
+set.seed(123)
+train.index <- sample(1:nrow(dtree), 200)
+nrow(dtree)
+```
+
+### Splitting
+```{r}
+train.set <- dtree[train.index,]
+class(train.set)
+```
+
+
+### Training
+```{r}
+dtree.tree <- tree(High~., train.set)
+plot(dtree.tree)
+text(dtree.tree, pretty = 0)
+summary(dtree.tree)
+```
+
+
+### Testing
+```{r}
+test.set <- dtree[-train.index,]
+High.test <- High[-train.index]
+
+tree.pred <- predict(dtree.tree, test.set, type="class")
+```
+
+
+### Accuracy
+```{r}
+table(tree.pred, High.test)
+accuracy = (87+65)/200
+accuracy
+```
+
+
+### Testing continued
+Predict the class of the test set using the trained decision tree
+```{r}
+tree.pred <- predict(dtree.tree, test.set, type="class")
+#If type = "class": for a classification tree, a factor of the predicted
+#classes (that with highest posterior probability, with ties split randomly).
+```
+
+
+### Confusion matrix
+Compare the predicted classes with the actual classes to evaluate the performance of the decision tree
+```{r}
+table(tree.pred, High.test)
+
+#calculate the accuracy of the decision tree on the test set
+accuracy = (87+65)/200
+accuracy
+
+#calculating the misclassification rate (1-accuracy)
+misclassification_rate <- 1-accuracy
+misclassification_rate
+```
+
+
+### K-fold cross-validation
+```{r}
+set.seed(123)
+folds <- createFolds(dtree$High, k=10, list=TRUE, returnTrain=FALSE)
+ctrl <- trainControl(method="cv", index=folds, savePredictions="final", classProbs=TRUE)
+set.seed(123)
+dtree.tree.cv <- train(High~., data=dtree, method="rpart", trControl=ctrl, tuneLength=10)
+dtree.tree.cv
+plot(dtree.tree.cv)
+```
+
+
+### Fine-tuning the decision tree
+Pruning the decision tree to avoid overfitting
+```{r}
+dtree.tree.prune <- prune.tree(dtree.tree, best=4)
+plot(dtree.tree.prune)
+text(dtree.tree.prune, pretty = 0)
+```
+
+
+### Cross-validation
+Using cross-validation to determine the optimal complexity parameter for pruning
+```{r}
+dtree.tree.cv.prune <- train(High~., data=dtree, method="rpart", trControl=ctrl, tuneLength=10, tuneGrid=data.frame(cp=seq(0.001, 0.1, by=0.001)))
+plot(dtree.tree.cv.prune)
+```
+
+
+### Predicting class of test set
+Using the pruned decision tree to predict the class of the test set
+```{r}
+tree.pred.prune <- predict(dtree.tree.prune, test.set, type="class")
+table(tree.pred.prune, High.test)
+```
+
+
+### Accuracy and misclassification rate
+```{r}
+accuracy.prune <- sum(tree.pred.prune == High.test)/length(High.test)
+misclassification_rate.prune <- 1-accuracy.prune
+accuracy.prune
+misclassification_rate.prune
+```
+
